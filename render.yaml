@@ -1,0 +1,18 @@
+services:
+  - type: cron
+    name: render-env-guard
+    runtime: python
+    region: frankfurt
+    plan: starter
+    schedule: "0 6 * * *"          # daily 06:00 UTC
+    buildCommand: "true"
+    startCommand: python check.py
+    envVars:
+      - key: RENDER_API_KEY
+        sync: false                # set in the dashboard, never committed
+      - key: RENDER_OWNER_ID
+        value: tea-clgi3lmg1b2c73a8u8mg
+      - key: ALLOW_UNPROTECTED
+        value: "evm-dajuht8ae00c73bf9fhg"  # ComSy / Production. Comma-separated environment ids allowed to stay unprotected
+      - key: MODE
+        value: alert               # alert | protect
