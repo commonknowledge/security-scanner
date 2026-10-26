@@ -6,14 +6,21 @@ Env vars:
   RENDER_OWNER_ID       Workspace owner id to check (required)
   ALLOW_UNPROTECTED     Comma-separated environment ids that may stay unprotected
   MODE                  "alert" (default): exit 1 if any offenders; "protect": set them protected
+  ALLOW_PREVIEWS        Comma-separated service ids whose PR previews may be automatic / long-lived
+  PREVIEW_MAX_DAYS      Paid preview services older than this fail the run (default 7)
+
+The PR preview check covers every workspace the API key can see, not just RENDER_OWNER_ID.
 """
 import json, os, sys, urllib.request
+from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
 KEY = os.environ["RENDER_API_KEY"]
 OWNER = os.environ["RENDER_OWNER_ID"]
 ALLOW = {e.strip() for e in os.environ.get("ALLOW_UNPROTECTED", "").split(",") if e.strip()}
 MODE = os.environ.get("MODE", "alert")
+ALLOW_PREVIEWS = {s.strip() for s in os.environ.get("ALLOW_PREVIEWS", "").split(",") if s.strip()}
+PREVIEW_MAX_DAYS = int(os.environ.get("PREVIEW_MAX_DAYS", "7"))
 
 
 def api(method, path, body=None):
@@ -55,6 +62,24 @@ for e in offenders:
 for name in loose:
     print(f"LOOSE SERVICE (not in any project): {name}")
 
+# PR previews: automatic previews on a paid plan, or paid previews left running, run up the bill unnoticed
+cutoff = datetime.now(timezone.utc) - timedelta(days=PREVIEW_MAX_DAYS)
+previews = []
+for o in paged("/owners"):
+    for s in paged(f"/services?ownerId={o['owner']['id']}"):
+        s = s["service"]
+        d = s.get("serviceDetails") or {}
+        parent = (d.get("parentServer") or {}).get("id")
+        if d.get("plan") == "free" or (parent or s["id"]) in ALLOW_PREVIEWS:
+            continue
+        if not parent and (d.get("previews") or {}).get("generation") == "automatic":
+            previews.append(f"AUTOMATIC PREVIEWS: {o['owner']['name']} / {s['name']} ({s['id']})")
+        elif parent and s["suspended"] == "not_suspended" and datetime.fromisoformat(s["createdAt"].replace("Z", "+00:00")) < cutoff:
+            previews.append(f"STALE PREVIEW (> {PREVIEW_MAX_DAYS} days): {o['owner']['name']} / {s['name']} ({s['id']})")
+print(f"{len(previews)} preview problems")
+for line in previews:
+    print(line)
+
 if MODE == "protect":
-    sys.exit(1 if loose else 0)
-sys.exit(1 if offenders or loose else 0)
+    sys.exit(1 if loose or previews else 0)
+sys.exit(1 if offenders or loose or previews else 0)
