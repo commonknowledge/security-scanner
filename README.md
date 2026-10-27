@@ -8,10 +8,17 @@ Daily Render cron job that checks:
   Common Knowledge one (`LOOSE_SCOPE=owner`);
 - PR previews follow company policy, in **every workspace the API key can see**.
 
-PR previews must be **manual**: the run fails if any service, on any plan, has automatic
-previews, or a preview service has been running for more than `PREVIEW_MAX_DAYS` (default 7).
-This catches previews switched on in the dashboard, which bypasses `render.yaml` (Resist Rent
-Rises ran 19 Standard previews for months).
+PR previews must be **manual**. The run fails if:
+
+- any service, on any plan, has automatic previews. These are **switched to manual
+  automatically** (whatever `MODE` is), and the run still fails so someone hears about it.
+  This catches previews switched on in the dashboard, which bypasses `render.yaml` (Resist Rent
+  Rises ran 19 Standard previews for months);
+- any Blueprint's `render.yaml` turns previews on: top-level `previewsEnabled: true` (Preview
+  Environments, which never show up as a service setting), or `generation: automatic` /
+  `pullRequestPreviewsEnabled: true`, which would switch them back on at the next sync. This
+  reads the file from GitHub, so it needs `GITHUB_TOKEN`; a Blueprint it can't read fails the run;
+- a preview service has been running for more than `PREVIEW_MAX_DAYS` (default 7).
 
 - `MODE=alert` (default): the run fails if any environment is unprotected or any service is
   loose. Render's failure notification is the alert.
@@ -22,4 +29,4 @@ Rises ran 19 Standard previews for months).
 - `ALLOW_PREVIEWS`: comma-separated service ids (the main service) whose previews may be
   automatic or long-lived.
 
-Run locally: `RENDER_API_KEY=... RENDER_OWNER_ID=tea-... python3 check.py`
+Run locally: `RENDER_API_KEY=... RENDER_OWNER_ID=tea-... GITHUB_TOKEN=$(gh auth token) python3 check.py`

@@ -12,12 +12,16 @@ Env vars:
   MODE                  "alert" (default): exit 1 if any offenders; "protect": set them protected
   ALLOW_PREVIEWS        Comma-separated service ids whose PR previews may be automatic / long-lived
   PREVIEW_MAX_DAYS      Preview services older than this fail the run (default 7)
+  GITHUB_TOKEN          Read-only GitHub token, to read Blueprints' render.yaml (required)
+
+Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
-import json, os, sys, urllib.request
+import json, os, re, sys, urllib.error, urllib.request
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
 KEY = os.environ["RENDER_API_KEY"]
+GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 OWNER = os.environ["RENDER_OWNER_ID"]
 LOOSE_SCOPE = os.environ.get("LOOSE_SCOPE", "all")
 ALLOW = {e.strip() for e in os.environ.get("ALLOW_UNPROTECTED", "").split(",") if e.strip()}
@@ -33,6 +37,14 @@ def api(method, path, body=None):
                                           "Content-Type": "application/json"})
     with urllib.request.urlopen(req) as r:
         return json.load(r)
+
+
+def github(path):
+    req = urllib.request.Request("https://api.github.com" + path,
+                                 headers={"Authorization": f"Bearer {GITHUB_TOKEN}",
+                                          "Accept": "application/vnd.github.raw+json"})
+    with urllib.request.urlopen(req) as r:
+        return r.read().decode()
 
 
 def paged(path):
@@ -74,7 +86,8 @@ for e in offenders:
 for name in loose:
     print(f"LOOSE SERVICE (not in any project): {name}")
 
-# PR previews must be manual (company policy), and previews left running pile up unnoticed
+# PR previews must be manual (company policy), and previews left running pile up unnoticed.
+# Automatic previews are switched to manual on the spot, but still fail the run so someone hears about it.
 cutoff = datetime.now(timezone.utc) - timedelta(days=PREVIEW_MAX_DAYS)
 previews = []
 for oid, ss in services.items():
@@ -84,9 +97,39 @@ for oid, ss in services.items():
         if (parent or s["id"]) in ALLOW_PREVIEWS:
             continue
         if not parent and (d.get("previews") or {}).get("generation") == "automatic":
-            previews.append(f"AUTOMATIC PREVIEWS: {owners[oid]} / {s['name']} ({s['id']})")
+            api("PATCH", f"/services/{s['id']}", {"serviceDetails": {"previews": {"generation": "manual"}}})
+            previews.append(f"AUTOMATIC PREVIEWS: {owners[oid]} / {s['name']} ({s['id']}) -> set to manual")
         elif parent and s["suspended"] == "not_suspended" and datetime.fromisoformat(s["createdAt"].replace("Z", "+00:00")) < cutoff:
             previews.append(f"STALE PREVIEW (> {PREVIEW_MAX_DAYS} days): {owners[oid]} / {s['name']} ({s['id']})")
+
+# Blueprints can switch previews back on at their next sync, and Preview Environments
+# (top-level previewsEnabled / previews) never show up as a service setting, so read every
+# Blueprint's render.yaml too
+AUTOMATIC_YAML = [re.compile(p, re.M) for p in (
+    r"^previewsEnabled:\s*[\"']?(true|yes)\b",               # Preview Environments (legacy key)
+    r"^[ \t]*generation:\s*[\"']?automatic\b",                # previews.generation, top-level or per service
+    r"^[ \t]*pullRequestPreviewsEnabled:\s*[\"']?(true|yes)\b",  # legacy per-service key
+)]
+for oid in owners:
+    for b in paged(f"/blueprints?ownerId={oid}"):
+        b = b["blueprint"]
+        label = f"{owners[oid]} / blueprint {b['name']} ({b['repo']}@{b['branch']}:{b['path']})"
+        m = re.match(r"https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$", b["repo"])
+        if not m:
+            previews.append(f"BLUEPRINT NOT CHECKED (not on GitHub): {label}")
+            continue
+        try:
+            yaml = github(f"/repos/{m[1]}/contents/{b['path']}?ref={b['branch']}")
+        except urllib.error.HTTPError as err:
+            # A Blueprint whose branch is gone can't sync, so it can't turn previews on
+            # (the branches API follows renames, so go by the contents API's message)
+            if err.code == 404 and "No commit found for the ref" in err.read().decode():
+                print(f"note: blueprint can't sync, branch is gone: {label}")
+                continue
+            previews.append(f"BLUEPRINT NOT CHECKED (GitHub {err.code}): {label}")
+            continue
+        if any(p.search(yaml) for p in AUTOMATIC_YAML):
+            previews.append(f"AUTOMATIC PREVIEWS IN BLUEPRINT: {label}")
 print(f"{len(previews)} preview problems")
 for line in previews:
     print(line)

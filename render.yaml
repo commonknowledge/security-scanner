@@ -10,6 +10,8 @@ services:
     envVars:
       - key: RENDER_API_KEY
         sync: false                # set in the dashboard, never committed
+      - key: GITHUB_TOKEN
+        sync: false                # read-only (Contents: read) on commonknowledge repos, to read Blueprints' render.yaml
       - key: RENDER_OWNER_ID
         value: tea-clgi3lmg1b2c73a8u8mg  # environments must be protected in this workspace only
       - key: LOOSE_SCOPE
