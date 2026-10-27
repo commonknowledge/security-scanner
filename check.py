@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Fail (or fix) when any Render environment is unprotected, any service is loose, or PR previews break policy.
 
-Every check covers every workspace the API key can see.
+Environment protection is checked in RENDER_OWNER_ID's workspace only; loose services in the
+workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can see.
 
 Env vars:
   RENDER_API_KEY        Render API key (required)
+  RENDER_OWNER_ID       Workspace whose environments must be protected (required)
+  LOOSE_SCOPE           "all" (default): loose services fail in every workspace; "owner": only RENDER_OWNER_ID's
   ALLOW_UNPROTECTED     Comma-separated environment ids that may stay unprotected
   MODE                  "alert" (default): exit 1 if any offenders; "protect": set them protected
   ALLOW_PREVIEWS        Comma-separated service ids whose PR previews may be automatic / long-lived
@@ -15,6 +18,8 @@ from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
 KEY = os.environ["RENDER_API_KEY"]
+OWNER = os.environ["RENDER_OWNER_ID"]
+LOOSE_SCOPE = os.environ.get("LOOSE_SCOPE", "all")
 ALLOW = {e.strip() for e in os.environ.get("ALLOW_UNPROTECTED", "").split(",") if e.strip()}
 MODE = os.environ.get("MODE", "alert")
 ALLOW_PREVIEWS = {s.strip() for s in os.environ.get("ALLOW_PREVIEWS", "").split(",") if s.strip()}
@@ -50,11 +55,16 @@ pname = {p["id"]: f"{owners[p['owner']['id']]} / {p['name']}" for p in projects}
 # created by Render outside any environment, so they're covered by the preview checks instead.
 placed = {sid for e in envs for sid in e["serviceIds"] + e["databasesIds"] + e["redisIds"]}
 loose = [f"{owners[oid]} / {s['name']}" for oid, ss in services.items() for s in ss
-         if s["id"] not in placed and not (s.get("serviceDetails") or {}).get("parentServer")]
+         if (LOOSE_SCOPE == "all" or oid == OWNER)
+         and s["id"] not in placed and not (s.get("serviceDetails") or {}).get("parentServer")]
 
-offenders = [e for e in envs if e["protectedStatus"] != "protected" and e["id"] not in ALLOW]
+# Environments only need to be private in the owner's workspace
+pown = {p["id"]: p["owner"]["id"] for p in projects}
+offenders = [e for e in envs if pown[e["projectId"]] == OWNER
+             and e["protectedStatus"] != "protected" and e["id"] not in ALLOW]
 print(f"{len(owners)} workspaces, {len(projects)} projects, {len(envs)} environments, "
-      f"{len(offenders)} unprotected (excluding {len(ALLOW)} allowed), {len(loose)} loose services")
+      f"{len(offenders)} unprotected in {owners[OWNER]} (excluding {len(ALLOW)} allowed), "
+      f"{len(loose)} loose services ({'all workspaces' if LOOSE_SCOPE == 'all' else owners[OWNER]})")
 
 for e in offenders:
     print(f"UNPROTECTED: {pname[e['projectId']]} / {e['name']} ({e['id']})")
