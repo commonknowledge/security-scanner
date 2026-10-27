@@ -13,7 +13,7 @@ services:
       - key: RENDER_OWNER_ID
         value: tea-clgi3lmg1b2c73a8u8mg  # environments must be protected in this workspace only
       - key: LOOSE_SCOPE
-        value: all                 # all | owner
+        value: owner               # all | owner
       - key: ALLOW_UNPROTECTED
         value: "evm-dajuht8ae00c73bf9fhg"  # ComSy / Production. Comma-separated environment ids allowed to stay unprotected
       - key: MODE
