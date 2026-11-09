@@ -1,4 +1,4 @@
-# render-env-guard
+# security-scanner
 
 Daily Render cron job that checks every environment in the Common Knowledge workspace is
 **protected** (so non-Admin members can't read secrets or open shells), and that no service
