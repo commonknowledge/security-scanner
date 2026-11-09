@@ -18,5 +18,7 @@ services:
         value: owner               # all | owner
       - key: ALLOW_UNPROTECTED
         value: "evm-dajuht8ae00c73bf9fhg"  # ComSy / Production. Comma-separated environment ids allowed to stay unprotected
+      - key: WORDPRESS_CHECKS
+        value: "off"               # on | off. Off until every Linear project has its Live URL
       - key: MODE
         value: alert               # alert | protect
