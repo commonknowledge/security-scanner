@@ -6,7 +6,9 @@ Daily Render cron job that checks:
   non-Admin members can't read secrets or open shells. Other workspaces don't need protecting;
 - no service sits outside a project, in every workspace (`LOOSE_SCOPE=all`) or only the
   Common Knowledge one (`LOOSE_SCOPE=owner`);
-- PR previews follow company policy, in **every workspace the API key can see**.
+- PR previews follow company policy, in **every workspace the API key can see**;
+- the latest release of the CK Health WordPress plugin (`wp-plugin/`) ships no outdated or
+  vulnerable dependencies (`plugin_deps.py`). See `wp-plugin/README.md`.
 
 PR previews must be **manual**. The run fails if:
 

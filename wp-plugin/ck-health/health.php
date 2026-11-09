@@ -1,6 +1,6 @@
 <?php
 /**
- * CK Health. Loaded by ../ck-health.php on PHP 7.2+.
+ * CK Health. Loaded by ck-health.php on PHP 7.2+.
  *
  * 1. Status endpoint: GET /wp-json/ck-health/v1/status (or ?rest_route=/ck-health/v1/status).
  *    Answers only requests signed with the scanner's private key; everyone else gets a 404.
@@ -16,8 +16,6 @@ namespace CommonKnowledge\Health;
 if (!defined('ABSPATH')) {
 	exit;
 }
-
-const VERSION = '0.1.0';
 
 /** The scanner's Ed25519 public key. The private key is held only by the scanner. */
 const SCANNER_PUBLIC_KEY = 'qjpe29WNhEWuSdL89zQbCVyamdSKwEWEVyQO+Yy1/gk=';
@@ -413,7 +411,7 @@ function status_response(): \WP_REST_Response {
 	audit_passwords(AUDIT_REQUEST_BUDGET);
 	$visitor = resolve_visitor_ip($_SERVER);
 	$response = new \WP_REST_Response([
-		'plugin_version' => VERSION,
+		'plugin_version' => get_file_data(CK_HEALTH_FILE, ['Version' => 'Version'])['Version'],
 		'wordpress' => wordpress_status(),
 		'php' => ['version' => PHP_VERSION],
 		'plugins' => plugin_status(),

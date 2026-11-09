@@ -3,7 +3,7 @@
 define('ABSPATH', __DIR__);
 function add_action() {}
 function add_filter() {}
-require __DIR__ . '/../mu-plugins/ck-health/health.php';
+require __DIR__ . '/../ck-health/health.php';
 
 use function CommonKnowledge\Health\resolve_visitor_ip;
 

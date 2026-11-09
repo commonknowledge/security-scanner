@@ -1,0 +1,44 @@
+# Tag main as vX.Y.Z (matching the Version header in wp-plugin/ck-health/ck-health.php) to
+# publish a CK Health release. Sites pick it up through their normal plugin updates.
+name: Release CK Health plugin
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the plugin version matches the tag
+        run: |
+          version=$(sed -n 's/^ \* Version: *//p' wp-plugin/ck-health/ck-health.php)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Plugin header says $version but the tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+
+      - name: Test
+        run: |
+          php -l wp-plugin/ck-health/ck-health.php
+          php -l wp-plugin/ck-health/health.php
+          php wp-plugin/tests/ip_test.php
+
+      - name: Install dependencies from composer.lock
+        run: composer install --no-dev --no-interaction --working-dir=wp-plugin/ck-health
+
+      - name: Refuse to release vulnerable dependencies
+        run: composer audit --locked --working-dir=wp-plugin/ck-health
+
+      - name: Build zip
+        run: cd wp-plugin && zip -r ../ck-health.zip ck-health -x 'ck-health/composer.json' 'ck-health/composer.lock'
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" ck-health.zip --title "CK Health $GITHUB_REF_NAME" --generate-notes

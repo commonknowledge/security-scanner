@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Fail (or fix) when any Render environment is unprotected, any service is loose, or PR previews break policy.
+Also fails when the CK Health WordPress plugin's latest release has outdated or vulnerable dependencies
+(see plugin_deps.py).
 
 Environment protection is checked in RENDER_OWNER_ID's workspace only; loose services in the
 workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can see.
@@ -17,6 +19,7 @@ Env vars:
 Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
 import json, os, re, sys, urllib.error, urllib.request
+import plugin_deps
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
@@ -136,6 +139,12 @@ print(f"{len(previews)} preview problems")
 for line in previews:
     print(line)
 
+# A security hole in the plugin we install on every WordPress site would be the worst kind
+plugin = plugin_deps.problems(GITHUB_TOKEN)
+print(f"{len(plugin)} CK Health plugin dependency problems")
+for line in plugin:
+    print(line)
+
 if MODE == "protect":
-    sys.exit(1 if loose or previews else 0)
-sys.exit(1 if offenders or loose or previews else 0)
+    sys.exit(1 if loose or previews or plugin else 0)
+sys.exit(1 if offenders or loose or previews or plugin else 0)

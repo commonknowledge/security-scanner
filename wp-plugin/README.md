@@ -1,17 +1,18 @@
-# CK Health (WordPress must-use plugin)
+# CK Health (WordPress plugin)
 
 Installed on every Common Knowledge WordPress site so the daily scanner can check it. No configuration.
 
 ## Install
 
-Copy everything in `mu-plugins/` into the site's `wp-content/mu-plugins/`:
+1. Download `ck-health.zip` from the [latest release](https://github.com/commonknowledge/security-scanner/releases/latest).
+2. In the site's admin, go to Plugins → Add New → Upload Plugin, upload the zip and activate it.
+3. Optionally, turn on auto-updates for it on the Plugins screen.
 
-```
-wp-content/mu-plugins/ck-health.php
-wp-content/mu-plugins/ck-health/health.php
-```
+From then on, new releases show up as normal plugin updates. They come from this repo's GitHub releases
+(via [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker)), never from WordPress.org.
+The `Update URI` header stops WordPress.org from offering an unrelated plugin with the same slug.
 
-Must-use plugins can't be deactivated from the admin screen. The loader does nothing on PHP older than 7.2, so it can't crash an old site. The scanner then gets no answer and reports the site.
+If a client admin deactivates the plugin, the site stops answering the scanner and gets reported.
 
 ## What it does
 
@@ -34,6 +35,26 @@ Must-use plugins can't be deactivated from the admin screen. The loader does not
   limiting is skipped rather than risk locking everyone out. The status response shows what was
   detected, so the scanner can check it against its own IP.
 
+The checks need PHP 7.2 and updates need PHP 7.4. The main file uses only old PHP syntax, so it
+can't crash a site on an older PHP version; it just stays off, and the scanner reports the site.
+
+## Releasing
+
+1. Bump `Version:` in `ck-health/ck-health.php`, merge to `main`.
+2. Tag `main` as `v<version>` and push the tag (`git tag v0.2.1 && git push origin v0.2.1`).
+3. The `Release CK Health plugin` workflow checks the version matches, runs the tests, installs the
+   locked dependencies, refuses to release if `composer audit` finds a vulnerability, then publishes
+   `ck-health.zip` as a GitHub release.
+
+## Dependencies
+
+The only dependency is Plugin Update Checker, locked in `ck-health/composer.lock`.
+
+- Dependabot opens a PR when it has an update.
+- The daily scanner (`plugin_deps.py`) fails if the **latest release** ships any dependency that
+  isn't on its latest stable version or has a known security advisory. Merging Dependabot's PR
+  isn't enough: the failure clears once a new release is tagged.
+
 ## Signing
 
 Signed message: `"ck-health-v1\n" + <unix timestamp>`, sent as headers
@@ -42,7 +63,7 @@ from the site's clock are rejected.
 
 The public key is in `health.php`. The private key is in `.secrets/ck-health-signing-key`
 (git-ignored) and goes in the scanner's Render environment. If it's lost or leaked, generate a
-new pair, update the public key and redeploy the plugin everywhere.
+new pair, update the public key and release a new version.
 
 ## Tests
 
