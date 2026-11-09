@@ -122,9 +122,11 @@ for oid in owners:
             yaml = github(f"/repos/{m[1]}/contents/{b['path']}?ref={b['branch']}")
         except urllib.error.HTTPError as err:
             # A Blueprint whose branch is gone can't sync, so it can't turn previews on
-            # (the branches API follows renames, so go by the contents API's message)
+            # (the branches API follows renames, so go by the contents API's message).
+            # Only worth a note if auto-sync is on; with it off, the dead branch is deliberate.
             if err.code == 404 and "No commit found for the ref" in err.read().decode():
-                print(f"note: blueprint can't sync, branch is gone: {label}")
+                if b.get("autoSync"):
+                    print(f"note: blueprint can't sync, branch is gone: {label}")
                 continue
             previews.append(f"BLUEPRINT NOT CHECKED (GitHub {err.code}): {label}")
             continue
