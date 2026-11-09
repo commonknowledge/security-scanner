@@ -1,6 +1,6 @@
 services:
   - type: cron
-    name: render-env-guard
+    name: security-scanner
     runtime: python
     region: frankfurt
     plan: starter

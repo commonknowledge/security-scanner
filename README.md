@@ -1,4 +1,4 @@
-# render-env-guard
+# security-scanner
 
 Daily Render cron job that checks:
 
