@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Fail (or fix) when any Render environment is unprotected, any service is loose, or PR previews break policy.
 With WORDPRESS_CHECKS=on, also fails when the CK Health WordPress plugin's latest release has outdated or
-vulnerable dependencies (see plugin_deps.py).
+vulnerable dependencies (see plugin_deps.py), or when a Linear project that should list its website
+doesn't (see linear_sites.py).
 
 Environment protection is checked in RENDER_OWNER_ID's workspace only; loose services in the
 workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can see.
@@ -16,11 +17,12 @@ Env vars:
   PREVIEW_MAX_DAYS      Preview services older than this fail the run (default 7)
   GITHUB_TOKEN          Read-only GitHub token, to read Blueprints' render.yaml (required)
   WORDPRESS_CHECKS      "on": also run the WordPress checks; anything else (default): skip them
+  LINEAR_API_KEY        Read-only Linear API key, to list the sites (required when WORDPRESS_CHECKS is on)
 
 Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
 import json, os, re, sys, urllib.error, urllib.request
-import plugin_deps
+import linear_sites, plugin_deps
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
@@ -34,6 +36,7 @@ ALLOW_PREVIEWS = {s.strip() for s in os.environ.get("ALLOW_PREVIEWS", "").split(
 PREVIEW_MAX_DAYS = int(os.environ.get("PREVIEW_MAX_DAYS", "7"))
 # Off until every Linear project has its Live URL, so the scanner can find the sites
 WORDPRESS_CHECKS = os.environ.get("WORDPRESS_CHECKS", "off") == "on"
+LINEAR_API_KEY = os.environ.get("LINEAR_API_KEY", "")
 
 
 def api(method, path, body=None):
@@ -144,13 +147,19 @@ for line in previews:
 
 # A security hole in the plugin we install on every WordPress site would be the worst kind
 plugin = plugin_deps.problems(GITHUB_TOKEN) if WORDPRESS_CHECKS else []
+# Sites come from Linear, so a project missing its Live URL is a site nobody scans.
+# `sites` is for the per-site checks to come; `not-maintained` ones only go in the weekly digest.
+sites, linear = linear_sites.load(LINEAR_API_KEY) if WORDPRESS_CHECKS else ([], [])
 if WORDPRESS_CHECKS:
     print(f"{len(plugin)} CK Health plugin dependency problems")
     for line in plugin:
+        print(line)
+    print(f"{len(linear)} Linear site list problems")
+    for line in linear:
         print(line)
 else:
     print("WordPress checks skipped (WORDPRESS_CHECKS is not on)")
 
 if MODE == "protect":
-    sys.exit(1 if loose or previews or plugin else 0)
-sys.exit(1 if offenders or loose or previews or plugin else 0)
+    sys.exit(1 if loose or previews or plugin or linear else 0)
+sys.exit(1 if offenders or loose or previews or plugin or linear else 0)

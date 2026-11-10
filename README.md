@@ -9,7 +9,19 @@ Daily Render cron job that checks:
 - PR previews follow company policy, in **every workspace the API key can see**;
 - with `WORDPRESS_CHECKS=on` (off by default, until every Linear project has its Live URL): the
   latest release of the CK Health WordPress plugin (`wp-plugin/`) ships no outdated or
-  vulnerable dependencies (`plugin_deps.py`). See `wp-plugin/README.md`.
+  vulnerable dependencies (`plugin_deps.py`). See `wp-plugin/README.md`. It also builds the list
+  of sites from Linear (`linear_sites.py`, needs `LINEAR_API_KEY`), described below.
+
+## Site list (Linear)
+
+Every Linear project in Design & Build, Wrap up, Active maintenance or Completed needs either:
+
+- a project link named `Live URL` (and `Staging URL` if there is one; names are case-insensitive), or
+- the `no-website` label.
+
+Otherwise the run fails. Sites we no longer maintain keep their `Live URL` and also get the
+`not-maintained` label: they're still scanned, but their problems will only go in the weekly
+digest, not in immediate alerts.
 
 PR previews must be **manual**. The run fails if:
 
