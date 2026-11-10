@@ -1,0 +1,12 @@
+# Opens PRs when the CK Health plugin's dependencies have updates. Merge, bump the plugin
+# version and tag a release; the daily scanner fails until the release is up to date.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /wp-plugin/ck-health
+    schedule:
+      interval: daily
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

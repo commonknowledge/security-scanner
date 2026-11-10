@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Fail (or fix) when any Render environment is unprotected, any service is loose, or PR previews break policy.
+With WORDPRESS_CHECKS=on, also fails when the CK Health WordPress plugin's latest release has outdated or
+vulnerable dependencies (see plugin_deps.py).
 
 Environment protection is checked in RENDER_OWNER_ID's workspace only; loose services in the
 workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can see.
@@ -13,10 +15,12 @@ Env vars:
   ALLOW_PREVIEWS        Comma-separated service ids whose PR previews may be automatic / long-lived
   PREVIEW_MAX_DAYS      Preview services older than this fail the run (default 7)
   GITHUB_TOKEN          Read-only GitHub token, to read Blueprints' render.yaml (required)
+  WORDPRESS_CHECKS      "on": also run the WordPress checks; anything else (default): skip them
 
 Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
 import json, os, re, sys, urllib.error, urllib.request
+import plugin_deps
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
@@ -28,6 +32,8 @@ ALLOW = {e.strip() for e in os.environ.get("ALLOW_UNPROTECTED", "").split(",") i
 MODE = os.environ.get("MODE", "alert")
 ALLOW_PREVIEWS = {s.strip() for s in os.environ.get("ALLOW_PREVIEWS", "").split(",") if s.strip()}
 PREVIEW_MAX_DAYS = int(os.environ.get("PREVIEW_MAX_DAYS", "7"))
+# Off until every Linear project has its Live URL, so the scanner can find the sites
+WORDPRESS_CHECKS = os.environ.get("WORDPRESS_CHECKS", "off") == "on"
 
 
 def api(method, path, body=None):
@@ -136,6 +142,15 @@ print(f"{len(previews)} preview problems")
 for line in previews:
     print(line)
 
+# A security hole in the plugin we install on every WordPress site would be the worst kind
+plugin = plugin_deps.problems(GITHUB_TOKEN) if WORDPRESS_CHECKS else []
+if WORDPRESS_CHECKS:
+    print(f"{len(plugin)} CK Health plugin dependency problems")
+    for line in plugin:
+        print(line)
+else:
+    print("WordPress checks skipped (WORDPRESS_CHECKS is not on)")
+
 if MODE == "protect":
-    sys.exit(1 if loose or previews else 0)
-sys.exit(1 if offenders or loose or previews else 0)
+    sys.exit(1 if loose or previews or plugin else 0)
+sys.exit(1 if offenders or loose or previews or plugin else 0)

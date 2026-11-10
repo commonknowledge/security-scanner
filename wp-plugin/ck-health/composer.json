@@ -1,0 +1,15 @@
+{
+    "name": "commonknowledge/ck-health",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "yahnis-elsts/plugin-update-checker": "^6.0"
+    },
+    "config": {
+        "platform": {
+            "php": "7.4.33"
+        },
+        "optimize-autoloader": true
+    },
+    "description": "Lets the Common Knowledge security scanner check this WordPress site."
+}
