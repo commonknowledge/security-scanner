@@ -2,3 +2,6 @@ __pycache__/
 .env
 .secrets/
 wp-plugin/ck-health/vendor/
+# Internal Linear audit notes: client project list, not for this public repo
+linear-projects.md
+live-url-audit.md
