@@ -25,13 +25,13 @@ or the digest failing to send), and Render's failure notification is the alert f
 
 Every Linear project in Design & Build, Wrap up, Active maintenance, Completed or Paused needs either:
 
-- a project link named `Live URL` (and `Staging URL` if there is one; names are case-insensitive).
-  In Design & Build, a `Staging URL` alone is enough, since the site may not be live yet; or
+- a project link named `Live URL` (and `Staging URL` if there is one; names are case-insensitive), or
 - the `no-website` label.
 
-Otherwise it's in the digest. A Design & Build project with no links at all may not have a site
-yet, so it's only in the digest on days its issues changed in Linear: work is happening, so maybe a
-staging site exists now. Quiet projects don't nag.
+Otherwise it's in the digest. A Design & Build project may not be live yet, so until it has a
+`Live URL` it's only in the digest on days its issues changed in Linear: work is happening, so maybe
+a staging site or the live site exists now. That carries on after a `Staging URL` is added, because
+a site can launch before anyone moves the project out of Design & Build. Quiet projects don't nag.
 
 Sites we no longer maintain keep their `Live URL` and also get the `not-maintained` label: they're
 still scanned. Archived projects are included, and count as `not-maintained` without needing the

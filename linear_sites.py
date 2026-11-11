@@ -4,13 +4,13 @@ Every Linear project in an in-scope status (Design & Build, Wrap up, Active main
 or Paused: sites have been hacked within a day of going live, and a paused project's site is often
 still up, so every stage counts) needs either:
 
-- a project link named `Live URL` (and `Staging URL` if it has one), case-insensitive. In Design &
-  Build, a `Staging URL` alone is enough, since the site may not be live yet; or
+- a project link named `Live URL` (and `Staging URL` if it has one), case-insensitive; or
 - the `no-website` label.
 
-A Design & Build project with no links at all may simply not have a site yet, so it's only reported
-on days its issues changed: work is happening, so maybe a staging site exists now. Quiet projects
-don't nag.
+A Design & Build project may not be live yet, so until it has a `Live URL` it's only reported on
+days its issues changed: work is happening, so maybe a staging site or the live site exists now.
+That keeps going after a `Staging URL` is added, because a site can launch before anyone moves the
+project out of Design & Build. Quiet projects don't nag. Its `Staging URL` is scanned meanwhile.
 
 A site we no longer maintain keeps its `Live URL` and gets the `not-maintained` label too. It is
 still scanned, so each site carries `maintained`. Archived projects are included and count as
@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 API = "https://api.linear.app/graphql"
 IN_SCOPE = {"design & build", "wrap up", "active maintenance", "completed", "paused"}
-STAGING_ENOUGH = {"design & build"}  # not live yet, so staging is all there is to scan
+NOT_LIVE_YET = {"design & build"}  # may not be live yet: only reported on days with issue activity
 LINK_KINDS = {"live url": "live", "staging url": "staging"}
 NO_WEBSITE = "no-website"
 NOT_MAINTAINED = "not-maintained"
@@ -35,6 +35,7 @@ query Projects($after: String) {
       name
       url
       archivedAt
+      trashed
       status { name }
       labels(first: 20) { nodes { name } }
       externalLinks(first: 50) { nodes { label url } }
@@ -78,12 +79,12 @@ def _paged(api_key, query, key, variables=None):
 
 
 def _fetch(api_key):
-    """Every project, archived too, as {name, url, status, archived, labels, links: [{label, url}]}."""
+    """Every project, archived too but not deleted (trashed), as {name, url, status, archived, labels, links: [{label, url}]}."""
     return [{"name": p["name"], "url": p["url"], "status": (p.get("status") or {}).get("name", ""),
              "archived": bool(p.get("archivedAt")),
              "labels": [l["name"] for l in p["labels"]["nodes"]],
              "links": [{"label": l["label"], "url": l["url"]} for l in p["externalLinks"]["nodes"]]}
-            for p in _paged(api_key, PROJECTS, "projects")]
+            for p in _paged(api_key, PROJECTS, "projects") if not p.get("trashed")]
 
 
 def _active(api_key, now=None):
@@ -114,11 +115,13 @@ def classify(projects, active=frozenset()):
             if NOT_MAINTAINED in labels:
                 problems.append(f"LINEAR: project is labelled both {NO_WEBSITE} and {NOT_MAINTAINED}: {where}")
             continue
-        if status in STAGING_ENOUGH and not found:
+        has_live = any(kind == "live" for kind, _ in found)
+        if status in NOT_LIVE_YET and not has_live:
             if p["url"] in active:
-                problems.append(f"LINEAR: issues changed in the last day, but there's no Staging URL or Live URL yet "
+                missing = "Live URL" if any(kind == "staging" for kind, _ in found) else "Staging URL or Live URL"
+                problems.append(f"LINEAR: issues changed in the last day, but there's no {missing} yet "
                                 f"({p['status']}): {where}")
-        elif not any(kind == "live" or status in STAGING_ENOUGH for kind, _ in found):
+        elif not has_live:
             problems.append(f"LINEAR: no Live URL link and no {NO_WEBSITE} label ({p['status']}): {where}")
         for kind, url in found:
             if not url.lower().startswith(("http://", "https://")):
