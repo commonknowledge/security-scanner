@@ -13,7 +13,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check the plugin version matches the tag
         run: |
@@ -28,6 +28,7 @@ jobs:
           php -l wp-plugin/ck-health/ck-health.php
           php -l wp-plugin/ck-health/health.php
           php wp-plugin/tests/ip_test.php
+          php wp-plugin/tests/user_list_test.php
 
       - name: Install dependencies from composer.lock
         run: composer install --no-dev --no-interaction --working-dir=wp-plugin/ck-health

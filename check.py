@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Report (or fix) Render environments that are unprotected, services that are loose, and PR previews
-that break policy. With WORDPRESS_CHECKS=on, also report outdated or vulnerable dependencies in the
-CK Health WordPress plugin's latest release (see plugin_deps.py), and Linear projects that should
-list their website but don't (see linear_sites.py).
+that break policy, and any of the scanner's own dependencies that are out of date or vulnerable
+(see scanner_deps.py). With WORDPRESS_CHECKS=on, also report outdated or vulnerable dependencies in
+the CK Health WordPress plugin's latest release (see plugin_deps.py), Linear projects that should
+list their website but don't (see linear_sites.py), and problems on every listed site (see sites.py).
 
 Everything found goes into one daily digest email to tech@ (see digest.py). Security issues never
 fail the run: a failed run means the scanner itself broke.
@@ -21,6 +22,7 @@ Env vars:
   GITHUB_TOKEN          Read-only GitHub token, to read Blueprints' render.yaml (required)
   WORDPRESS_CHECKS      "on": also run the WordPress checks; anything else (default): skip them
   LINEAR_API_KEY        Read-only Linear API key, to list the sites (required when WORDPRESS_CHECKS is on)
+  CK_HEALTH_SIGNING_KEY Base64 Ed25519 key (libsodium format) that signs requests to the CK Health plugin
   SMTP2GO_API_KEY       SMTP2GO API key, to email the digest (without it, the digest is only printed)
   DIGEST_TO             Who gets the digest (default tech@commonknowledge.coop)
   DIGEST_FROM           Who it's from (default "CK Security Scanner <security-scanner@commonknowledge.coop>")
@@ -28,7 +30,7 @@ Env vars:
 Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
 import json, os, re, urllib.error, urllib.request
-import digest, linear_sites, plugin_deps
+import digest, linear_sites, plugin_deps, scanner_deps, sites
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
@@ -148,17 +150,22 @@ for oid in owners:
             continue
         if any(p.search(yaml) for p in AUTOMATIC_YAML):
             previews.append(f"AUTOMATIC PREVIEWS IN BLUEPRINT: {label}")
-# A security hole in the plugin we install on every WordPress site would be the worst kind
-plugin = plugin_deps.problems(GITHUB_TOKEN) if WORDPRESS_CHECKS else []
+# The scanner and the plugin it installs on every WordPress site must both run on up-to-date,
+# unvulnerable dependencies: a hole in either would be the worst kind
+deps = scanner_deps.problems(GITHUB_TOKEN) + (plugin_deps.problems(GITHUB_TOKEN) if WORDPRESS_CHECKS else [])
 # Sites come from Linear, so a project missing its Live URL is a site nobody scans.
-# `sites` is for the per-site checks to come.
-sites, linear = linear_sites.load(LINEAR_API_KEY) if WORDPRESS_CHECKS else ([], [])
+site_list, linear = linear_sites.load(LINEAR_API_KEY) if WORDPRESS_CHECKS else ([], [])
+# Every listed site: up, HTTPS, nothing exposed, and (maintained WordPress) the CK Health report
+maintained, not_maintained = (sites.problems(site_list, os.environ.get("CK_HEALTH_SIGNING_KEY"), GITHUB_TOKEN)
+                              if WORDPRESS_CHECKS else ([], []))
 
 digest.send({
     "Unprotected Render environments": unprotected,
     "Render services outside any project": loose,
     "PR previews": previews,
-    "CK Health plugin dependencies": plugin,
+    "Scanner and CK Health plugin dependencies": deps,
+    "Sites": maintained,
+    "Sites not maintained by us (archived projects, or labelled not-maintained)": not_maintained,
     "Linear site list": linear,
 }, notes=[] if WORDPRESS_CHECKS else ["WordPress checks skipped (WORDPRESS_CHECKS is not on)"],
    api_key=os.environ.get("SMTP2GO_API_KEY"))

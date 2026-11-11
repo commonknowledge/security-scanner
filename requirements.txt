@@ -1,0 +1,5 @@
+# Every package the scanner installs, pinned, including sub-dependencies (cryptography -> cffi -> pycparser).
+# The daily scan reports any that isn't the latest stable release or has a known vulnerability (scanner_deps.py).
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12

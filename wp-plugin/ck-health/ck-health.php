@@ -2,8 +2,8 @@
 /**
  * Plugin Name: CK Health
  * Plugin URI: https://github.com/commonknowledge/security-scanner
- * Description: Lets the Common Knowledge security scanner check this site's WordPress and PHP versions and find accounts with easily guessed passwords. Also slows down password guessing on the login form.
- * Version: 0.2.0
+ * Description: Lets the Common Knowledge security scanner check this site's WordPress and PHP versions and find accounts with easily guessed passwords. Also slows down password guessing on the login form, and hides the user list from visitors.
+ * Version: 0.3.0
  * Requires PHP: 7.2
  * Author: Common Knowledge
  * License: GPL-2.0-or-later

@@ -9,6 +9,9 @@
  *    via WP-Cron, and on each status request). Never stores or reports a password.
  * 3. Login rate limiting: after 10 failed logins from one visitor IP within 15 minutes,
  *    further attempts from that IP are refused until the 15 minutes are up.
+ * 4. User list: the REST API's user list (/wp-json/wp/v2/users) is only available to logged-in
+ *    users, so visitors can't harvest login names from it. The block editor, which uses it
+ *    while logged in, is unaffected.
  */
 
 namespace CommonKnowledge\Health;
@@ -386,6 +389,25 @@ function theme_status(): array {
 	}
 	return $out;
 }
+
+// ---------------------------------------------------------------------------
+// User list
+// ---------------------------------------------------------------------------
+
+/**
+ * Refuse the REST API's user routes to visitors who aren't logged in. Runs after REST
+ * authentication (cookie + nonce, application passwords), so a logged-in editor still gets them.
+ */
+function protect_user_list($result, $server, $request) {
+	if ($result !== null || is_user_logged_in()) {
+		return $result;
+	}
+	if (preg_match('#^/wp/v2/users(/|$)#', (string) $request->get_route())) {
+		return new \WP_Error('rest_user_cannot_view', 'Sorry, you are not allowed to list users.', ['status' => rest_authorization_required_code()]);
+	}
+	return $result;
+}
+add_filter('rest_pre_dispatch', __NAMESPACE__ . '\\protect_user_list', 10, 3);
 
 // ---------------------------------------------------------------------------
 // Status endpoint

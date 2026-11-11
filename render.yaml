@@ -5,15 +5,19 @@ services:
     region: frankfurt
     plan: starter
     schedule: "0 6 * * *"          # daily 06:00 UTC
-    buildCommand: "true"
+    buildCommand: pip install -r requirements.txt
     startCommand: python check.py
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.15.2"            # the scan reports it when a newer Python is out (scanner_deps.py)
       - key: RENDER_API_KEY
         sync: false                # set in the dashboard, never committed
       - key: GITHUB_TOKEN
         sync: false                # read-only (Contents: read) on commonknowledge repos, to read Blueprints' render.yaml
       - key: LINEAR_API_KEY
         sync: false                # read-only Linear key, to list the sites. Needed once WORDPRESS_CHECKS is on
+      - key: CK_HEALTH_SIGNING_KEY
+        sync: false                # Ed25519 key that signs requests to the CK Health plugin (.secrets/ck-health-signing-key)
       - key: SMTP2GO_API_KEY
         sync: false                # emails the daily digest to tech@. Without it, the digest is only printed
       - key: RENDER_OWNER_ID

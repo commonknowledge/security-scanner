@@ -14,6 +14,8 @@ The `Update URI` header stops WordPress.org from offering an unrelated plugin wi
 
 If a client admin deactivates the plugin, the site stops answering the scanner and gets reported.
 
+The scanner reads the status report in `sites.py` and puts any problem in its daily digest.
+
 ## What it does
 
 - **Status endpoint** `GET /?rest_route=/ck-health/v1/status` (or `/wp-json/ck-health/v1/status`).
@@ -35,6 +37,11 @@ If a client admin deactivates the plugin, the site stops answering the scanner a
   limiting is skipped rather than risk locking everyone out. The status response shows what was
   detected, so the scanner can check it against its own IP.
 
+- **User list.** WordPress's REST API lists the accounts that have published posts
+  (`/wp-json/wp/v2/users`) to anyone, and their slugs are usually their login names. The plugin
+  refuses these routes to visitors who aren't logged in. The block editor uses them while logged
+  in, so editing is unaffected.
+
 The checks need PHP 7.2 and updates need PHP 7.4. The main file uses only old PHP syntax, so it
 can't crash a site on an older PHP version; it just stays off, and the scanner reports the site.
 
@@ -51,9 +58,9 @@ can't crash a site on an older PHP version; it just stays off, and the scanner r
 The only dependency is Plugin Update Checker, locked in `ck-health/composer.lock`.
 
 - Dependabot opens a PR when it has an update.
-- The daily scanner (`plugin_deps.py`) fails if the **latest release** ships any dependency that
-  isn't on its latest stable version or has a known security advisory. Merging Dependabot's PR
-  isn't enough: the failure clears once a new release is tagged.
+- The daily scanner's digest (`plugin_deps.py`) lists it if the **latest release** ships any
+  dependency that isn't on its latest stable version or has a known security advisory. Merging
+  Dependabot's PR isn't enough: it clears once a new release is tagged.
 
 ## Signing
 
@@ -69,4 +76,5 @@ new pair, update the public key and release a new version.
 
 ```
 php wp-plugin/tests/ip_test.php
+php wp-plugin/tests/user_list_test.php
 ```

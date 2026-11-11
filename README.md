@@ -7,10 +7,14 @@ Daily Render cron job that checks:
 - no service sits outside a project, in every workspace (`LOOSE_SCOPE=all`) or only the
   Common Knowledge one (`LOOSE_SCOPE=owner`);
 - PR previews follow company policy, in **every workspace the API key can see**;
+- the scanner itself runs on up-to-date dependencies (`scanner_deps.py`): every package pinned in
+  `requirements.txt` is the latest stable release with no known vulnerability, the Python running it
+  is the latest release (`PYTHON_VERSION` in `render.yaml`), and the GitHub Actions in
+  `.github/workflows` are on their latest major version. Dependabot opens PRs for all of these;
 - with `WORDPRESS_CHECKS=on` (off by default, until every Linear project has its Live URL): the
   latest release of the CK Health WordPress plugin (`wp-plugin/`) ships no outdated or
-  vulnerable dependencies (`plugin_deps.py`). See `wp-plugin/README.md`. It also builds the list
-  of sites from Linear (`linear_sites.py`, needs `LINEAR_API_KEY`), described below.
+  vulnerable dependencies (`plugin_deps.py`), and every website listed in Linear passes the site
+  checks below (`linear_sites.py` builds the list, `sites.py` checks it).
 
 ## Daily digest
 
@@ -36,6 +40,29 @@ a site can launch before anyone moves the project out of Design & Build. Quiet p
 Sites we no longer maintain keep their `Live URL` and also get the `not-maintained` label: they're
 still scanned. Archived projects are included, and count as `not-maintained` without needing the
 label.
+
+## Site checks
+
+Every site listed in Linear (`sites.py`). A site listed on several projects is checked once.
+
+- **Up and on HTTPS**, with a valid certificate that doesn't expire within 14 days. A staging site
+  that's down is skipped silently (staging is often switched off); a live one is reported. A site
+  behind a login (401) can't be checked further, which is fine.
+- **Nothing exposed** that should be private: a `.git` directory or `.env` file, and on WordPress a
+  public `wp-content/debug.log` or a browsable `wp-content/uploads/`. WordPress's public user list
+  (`/wp-json/wp/v2/users`) isn't reported: WordPress doesn't treat usernames as secret, the password
+  audit and login limiting are what protect accounts, and CK Health closes the list anyway.
+- **CK Health** (maintained WordPress sites only), through a request signed with
+  `CK_HEALTH_SIGNING_KEY` (see `wp-plugin/README.md`): the plugin answers and is the latest release;
+  WordPress, plugins and themes have no updates waiting; PHP is still supported; no account has an
+  easily guessed password; login rate limiting is on and sees the scanner's real IP (compared with
+  what most sites see); and WordPress is still checking for updates. A WordPress site whose plugin
+  doesn't answer also gets an open XML-RPC endpoint reported, since nothing rate-limits it.
+- **Bot protection**: a hosting firewall or Cloudflare challenge page instead of the site is
+  reported, since nothing behind it could be checked. Allowlist the scanner on that site.
+
+Sites not maintained by us (labelled `not-maintained`, or on an archived project) get only the
+first two, in their own section of the digest.
 
 ## PR previews
 
