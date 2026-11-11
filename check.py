@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Fail (or fix) when any Render environment is unprotected, any service is loose, or PR previews break policy.
-With WORDPRESS_CHECKS=on, also fails when the CK Health WordPress plugin's latest release has outdated or
-vulnerable dependencies (see plugin_deps.py), or when a Linear project that should list its website
-doesn't (see linear_sites.py).
+"""Report (or fix) Render environments that are unprotected, services that are loose, and PR previews
+that break policy. With WORDPRESS_CHECKS=on, also report outdated or vulnerable dependencies in the
+CK Health WordPress plugin's latest release (see plugin_deps.py), and Linear projects that should
+list their website but don't (see linear_sites.py).
+
+Everything found goes into one daily digest email to tech@ (see digest.py). Security issues never
+fail the run: a failed run means the scanner itself broke.
 
 Environment protection is checked in RENDER_OWNER_ID's workspace only; loose services in the
 workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can see.
@@ -10,19 +13,22 @@ workspaces set by LOOSE_SCOPE; PR previews in every workspace the API key can se
 Env vars:
   RENDER_API_KEY        Render API key (required)
   RENDER_OWNER_ID       Workspace whose environments must be protected (required)
-  LOOSE_SCOPE           "all" (default): loose services fail in every workspace; "owner": only RENDER_OWNER_ID's
+  LOOSE_SCOPE           "all" (default): loose services are reported in every workspace; "owner": only in RENDER_OWNER_ID's
   ALLOW_UNPROTECTED     Comma-separated environment ids that may stay unprotected
-  MODE                  "alert" (default): exit 1 if any offenders; "protect": set them protected
+  MODE                  "alert" (default): report unprotected environments; "protect": also set them protected
   ALLOW_PREVIEWS        Comma-separated service ids whose PR previews may be automatic / long-lived
-  PREVIEW_MAX_DAYS      Preview services older than this fail the run (default 7)
+  PREVIEW_MAX_DAYS      Preview services older than this are reported (default 7)
   GITHUB_TOKEN          Read-only GitHub token, to read Blueprints' render.yaml (required)
   WORDPRESS_CHECKS      "on": also run the WordPress checks; anything else (default): skip them
   LINEAR_API_KEY        Read-only Linear API key, to list the sites (required when WORDPRESS_CHECKS is on)
+  SMTP2GO_API_KEY       SMTP2GO API key, to email the digest (without it, the digest is only printed)
+  DIGEST_TO             Who gets the digest (default tech@commonknowledge.coop)
+  DIGEST_FROM           Who it's from (default "CK Security Scanner <security-scanner@commonknowledge.coop>")
 
 Automatic PR previews on a service are always switched to manual, whatever MODE is.
 """
-import json, os, re, sys, urllib.error, urllib.request
-import linear_sites, plugin_deps
+import json, os, re, urllib.error, urllib.request
+import digest, linear_sites, plugin_deps
 from datetime import datetime, timedelta, timezone
 
 API = "https://api.render.com/v1"
@@ -87,16 +93,17 @@ print(f"{len(owners)} workspaces, {len(projects)} projects, {len(envs)} environm
       f"{len(offenders)} unprotected in {owners[OWNER]} (excluding {len(ALLOW)} allowed), "
       f"{len(loose)} loose services ({'all workspaces' if LOOSE_SCOPE == 'all' else owners[OWNER]})")
 
+unprotected = []
 for e in offenders:
-    print(f"UNPROTECTED: {pname[e['projectId']]} / {e['name']} ({e['id']})")
+    line = f"UNPROTECTED: {pname[e['projectId']]} / {e['name']} ({e['id']})"
     if MODE == "protect":
         api("PATCH", f"/environments/{e['id']}", {"protectedStatus": "protected"})
-        print(f"  -> protected")
-for name in loose:
-    print(f"LOOSE SERVICE (not in any project): {name}")
+        line += " -> protected automatically"
+    unprotected.append(line)
+loose = [f"LOOSE SERVICE (not in any project): {name}" for name in loose]
 
 # PR previews must be manual (company policy), and previews left running pile up unnoticed.
-# Automatic previews are switched to manual on the spot, but still fail the run so someone hears about it.
+# Automatic previews are switched to manual on the spot, but still reported so someone hears about it.
 cutoff = datetime.now(timezone.utc) - timedelta(days=PREVIEW_MAX_DAYS)
 previews = []
 for oid, ss in services.items():
@@ -141,25 +148,17 @@ for oid in owners:
             continue
         if any(p.search(yaml) for p in AUTOMATIC_YAML):
             previews.append(f"AUTOMATIC PREVIEWS IN BLUEPRINT: {label}")
-print(f"{len(previews)} preview problems")
-for line in previews:
-    print(line)
-
 # A security hole in the plugin we install on every WordPress site would be the worst kind
 plugin = plugin_deps.problems(GITHUB_TOKEN) if WORDPRESS_CHECKS else []
 # Sites come from Linear, so a project missing its Live URL is a site nobody scans.
-# `sites` is for the per-site checks to come; `not-maintained` ones only go in the weekly digest.
+# `sites` is for the per-site checks to come.
 sites, linear = linear_sites.load(LINEAR_API_KEY) if WORDPRESS_CHECKS else ([], [])
-if WORDPRESS_CHECKS:
-    print(f"{len(plugin)} CK Health plugin dependency problems")
-    for line in plugin:
-        print(line)
-    print(f"{len(linear)} Linear site list problems")
-    for line in linear:
-        print(line)
-else:
-    print("WordPress checks skipped (WORDPRESS_CHECKS is not on)")
 
-if MODE == "protect":
-    sys.exit(1 if loose or previews or plugin or linear else 0)
-sys.exit(1 if offenders or loose or previews or plugin or linear else 0)
+digest.send({
+    "Unprotected Render environments": unprotected,
+    "Render services outside any project": loose,
+    "PR previews": previews,
+    "CK Health plugin dependencies": plugin,
+    "Linear site list": linear,
+}, notes=[] if WORDPRESS_CHECKS else ["WordPress checks skipped (WORDPRESS_CHECKS is not on)"],
+   api_key=os.environ.get("SMTP2GO_API_KEY"))

@@ -14,6 +14,8 @@ services:
         sync: false                # read-only (Contents: read) on commonknowledge repos, to read Blueprints' render.yaml
       - key: LINEAR_API_KEY
         sync: false                # read-only Linear key, to list the sites. Needed once WORDPRESS_CHECKS is on
+      - key: SMTP2GO_API_KEY
+        sync: false                # emails the daily digest to tech@. Without it, the digest is only printed
       - key: RENDER_OWNER_ID
         value: tea-clgi3lmg1b2c73a8u8mg  # environments must be protected in this workspace only
       - key: LOOSE_SCOPE
