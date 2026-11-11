@@ -37,9 +37,9 @@ Otherwise it's in the digest. A Design & Build project may not be live yet, so u
 a staging site or the live site exists now. That carries on after a `Staging URL` is added, because
 a site can launch before anyone moves the project out of Design & Build. Quiet projects don't nag.
 
-Sites we no longer maintain keep their `Live URL` and also get the `not-maintained` label: they're
-still scanned. Archived projects are included, and count as `not-maintained` without needing the
-label.
+Sites we no longer maintain keep their `Live URL` and also get the `no-maintained-website` label:
+they're still scanned. Archived projects are included too. Archiving doesn't mean a site stopped
+being ours, so only the label marks a site as not maintained.
 
 ## Site checks
 
@@ -61,7 +61,7 @@ Every site listed in Linear (`sites.py`). A site listed on several projects is c
 - **Bot protection**: a hosting firewall or Cloudflare challenge page instead of the site is
   reported, since nothing behind it could be checked. Allowlist the scanner on that site.
 
-Sites not maintained by us (labelled `not-maintained`, or on an archived project) get only the
+Sites not maintained by us (labelled `no-maintained-website`) get only the
 first two, in their own section of the digest.
 
 ## PR previews

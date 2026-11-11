@@ -165,7 +165,7 @@ digest.send({
     "PR previews": previews,
     "Scanner and CK Health plugin dependencies": deps,
     "Sites": maintained,
-    "Sites not maintained by us (archived projects, or labelled not-maintained)": not_maintained,
+    "Sites not maintained by us (labelled no-maintained-website)": not_maintained,
     "Linear site list": linear,
 }, notes=[] if WORDPRESS_CHECKS else ["WordPress checks skipped (WORDPRESS_CHECKS is not on)"],
    api_key=os.environ.get("SMTP2GO_API_KEY"))

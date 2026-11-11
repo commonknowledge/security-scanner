@@ -16,7 +16,7 @@ Maintained WordPress sites, through the CK Health plugin (signed request, see wp
 A WordPress site whose plugin doesn't answer also gets its XML-RPC endpoint reported, since without
 the plugin nothing rate-limits logins through it.
 
-Sites marked not-maintained (by label, or because their project is archived) only get the first
+Sites not maintained by us (labelled no-maintained-website) only get the first
 two groups, reported separately.
 """
 import base64, collections, json, os, re, socket, ssl, time, urllib.error, urllib.parse, urllib.request
