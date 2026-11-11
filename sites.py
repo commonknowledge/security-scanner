@@ -66,7 +66,10 @@ CHALLENGE_TITLES = re.compile(rb"<title[^>]*>\s*(One moment, please|Just a momen
 def is_challenge(body, headers):
     """A bot-protection page (hosting firewall, Cloudflare) instead of the site: it answers 200 or
     403/503, but nothing behind it can be checked."""
-    return (headers.get("cf-mitigated") or "").lower() == "challenge" or bool(CHALLENGE_TITLES.search(body[:5000]))
+    return ((headers.get("cf-mitigated") or "").lower() == "challenge"   # Cloudflare
+            or (headers.get("sg-captcha") or "").lower() == "challenge"   # SiteGround (answers 202)
+            or b"/.well-known/sgcaptcha/" in body[:5000]
+            or bool(CHALLENGE_TITLES.search(body[:5000])))
 
 
 def is_wordpress(body, headers, host):
